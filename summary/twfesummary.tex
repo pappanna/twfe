@@ -1,0 +1,118 @@
+\documentclass{beamer}
+\usepackage{float}
+\usepackage{amsmath}
+\usepackage{multicol}
+\usepackage[export]{adjustbox}
+\usepackage{multirow}
+\usepackage{arydshln}
+\usepackage[absolute,overlay]{textpos}
+
+% define colors
+\definecolor{blue}{RGB}{87, 172, 196}
+\definecolor{red}{RGB}{196,92,87}
+\definecolor{yellow}{RGB}{196,147,87}
+
+%% colors
+%% uncomment this if you want to change the background color to something else
+%\definecolor{MyBackground}{RGB}{255,253,218}
+%\setbeamercolor{background canvas}{bg=MyBackground}
+\newenvironment{transitionframe}{\setbeamercolor{background canvas}{bg=yellow}\begin{frame}}{\end{frame}}
+\setbeamercolor{frametitle}{fg=blue}
+\setbeamercolor{title}{fg=black}
+\setbeamertemplate{footline}[frame number]
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize items}{-}
+\setbeamercolor{itemize item}{fg=blue}
+\setbeamercolor{itemize subitem}{fg=blue}
+\setbeamercolor{enumerate item}{fg=blue}
+\setbeamercolor{enumerate subitem}{fg=blue}
+\setbeamercolor{button}{bg=white,fg=blue}
+
+% hypersetup
+\hypersetup{
+  colorlinks=false,
+  linkbordercolor = {white},
+  linkcolor = {blue}
+}
+
+%button 
+% \hyperlink{appendix_end}{\beamergotobutton{Next slide}}
+
+% itemize
+\newenvironment{wideitemize}{\itemize\addtolength{\itemsep}{8pt}}{\enditemize}
+\newenvironment{widesubitemize}{\itemize\addtolength{\itemsep}{4pt}}{\enditemize}
+
+% transition frame
+%\begin{transitionframe}
+%\begin{center}
+%{ \Huge \textcolor{black}{Spacing and Words}}
+%\end{center}
+%\end{transitionframe}
+
+% image source
+\setbeamercolor{framesource}{fg=lightgray}
+\setbeamerfont{framesource}{size=\tiny}
+\newcommand{\source}[1]{\begin{textblock*}{4cm}(8.7cm,8.6cm)
+    \begin{beamercolorbox}[ht=0.5cm,right]{framesource}
+        \usebeamerfont{framesource}\usebeamercolor[fg]{framesource} Image Source: {#1}
+    \end{beamercolorbox}
+\end{textblock*}}
+
+%Information to be included in the title page:
+\title{TWFE/DiD Literature}
+\author{Implementation of New Methods}
+\institute{Columbia University, Sustainable Development Colloquium}
+\date{November 5th, 2021}
+
+%%%%%%%%%%%%%%%%%%% BEGIN %%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+% title page
+\frame{\titlepage}
+
+% summary
+\begin{frame}
+\frametitle{Big Picture}
+{\color{yellow} Really big picture takeaway:} parallel trends are not sufficient to identify average treatment on treated (ATT) when there are heterogeneous treatment effects and differences in timing of the treatment. \\ \bigskip
+{\color{yellow} Bacon (2021):} generalized diff-in-diff $\beta$ is a big weighted average of simple, ``canonical'' $2\times2$ diff-in-diffs, where the weights depend on sample sizes and subsample variance of treatment. Four types of comparisons used: 1) treatment vs. never treated, 2) treatment vs. already treated, 3) earlier treatment vs. later treatment control, 4) later treatment vs. earlier treatment control.
+
+\end{frame}
+
+% methods
+\begin{frame}
+These papers are in the {\color{red} twfe/literature} folder.
+\frametitle{(Some) TWFE Methods}
+\footnotesize{
+\begin{wideitemize}
+	\item {\color{yellow} Bacon Decomposition (2021):} Decompose TWFE $\beta$ into separate coefficients and weights for each type of comparison.
+	\item {\color{yellow} Sun and Abraham (2021):}  (Weighted group-time ATT method) Event-study context, coefficients on TWFE lead/lag indicators can be biased, because of weights on cohort-specific ATTs; calculate all cohort-specific ATTs separately and aggregate w/ weighted average.
+	\item {\color{yellow} Callaway and Sant'Anna (2021):} (Weighted group-time ATT method)  Focus on ``good'' variations (do not use previously treated as control); estimate separate group-time ATTs (groups are units treated at the same point in time) and then aggregate estimates to a single ATT parameter.
+	\item {\color{yellow} Borusyak et al. (2021):} (Imputation method) Imputation based efficient estimator; estimate missing counterfactuals in multi-step process 
+	\item {\color{yellow} Wooldridge (2021):} Calculate TWFE with multiple treatment periods and different entry times and include interactions that allow for many different ATTs
+\end{wideitemize}
+}
+\end{frame}
+
+% data
+\begin{frame}
+These papers are in the {\color{red} twfe/data/datapapers} folder, while the datasets are in {\color{red} twfe/data}.
+\frametitle{Data for Testing Methods}
+\begin{wideitemize}
+	\item {\color{yellow} Stevenson and Wolfers (2006):} Explores the impacts of divorce law reform in the United States. Exploits the variation in the timing of unilateral divorce laws across states. The paper tests the impact of these laws on female suicide rates, domestic violence, and murders of females by their partners and finds a decrease in all of these.
+	\item {\color{yellow} Cheng and Hoekstra (2013):} Explores the impacts of ``Castle Doctrine'' (``stand your ground'') laws, which expand legal justification for using lethal force in self-defense, in the United States. Exploits the variation in the timing of these laws in 20+ states. The papers tests the impact of these laws on homicide and violent crime and finds that these laws lead to an increase in reported murders.
+\end{wideitemize}
+\end{frame}
+
+% code
+\begin{frame}
+Code for running these methods are in the {\color{red} twfe/code} folder.
+\frametitle{Code for Testing Methods}
+%\begin{wideitemize}
+%	\item {\color{yellow} Stevenson and Wolfers (2006):}
+%\end{wideitemize}
+\end{frame}
+
+
+
+\end{document}
