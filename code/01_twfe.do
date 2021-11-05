@@ -12,7 +12,7 @@
 
 ************* 00 - SETUP *************************************
 
-cd "/Users/annapapp/Desktop/phd/econometrics/twfe/"
+cd "/Users/annapapp/Desktop/twfe/"
 
 * scheme
 set scheme plotplain
