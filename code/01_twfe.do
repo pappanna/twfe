@@ -32,7 +32,7 @@ ssc install bacondecomp
 *** 1 = Stevenson and Wolfers 2006
 *** 2 = Cheng and Hoekstra 2013
 *** 3 = other (define variables)
-local datatorun = 2
+local datatorun = 1
 
 ****** set file name and label for graphs *****
 if `datatorun' == 0{
