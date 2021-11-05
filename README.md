@@ -14,4 +14,3 @@ Notes:
 - Potential issue with Sun and Abraham event study method in Stata, but runs well in R. 
 - Callaway and Sant'anna a lot faster in R. 
 
-Other helpful links: 
