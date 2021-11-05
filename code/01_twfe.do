@@ -24,7 +24,9 @@ ssc install did_imputation
 ssc install event_plot
 ssc install csdid 
 ssc install eventstudyinteract 
-ssc install bacondecomp 
+ssc install bacondecomp
+net install github, from("https://haghish.github.io/github/")
+github install lsun20/eventstudyinteract
 */
 
 * select data to run: 
@@ -288,7 +290,10 @@ use "data/`filename'.dta", clear
 
 * generate time to treat variables 
 gen time = `timevar' - `timetreatvar'
-replace time = 0 if missing(`timetreatvar')
+* Need to recode the endpoints so that they don't accidentally get
+* grouped in with the omitted treatment time observations. See here:
+* https://twitter.com/agoodmanbacon/status/1165643431525400588
+recode time (.=0) (-1000/`pretrendmin'=`pretrendmin') (`posttrendmax'/1000=`posttrendmax')
 gen treat = !missing(`timetreatvar')
 gen nevertreated = missing(`timetreatvar')
 
