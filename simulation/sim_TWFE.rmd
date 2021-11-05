@@ -50,6 +50,8 @@ library(tictoc)
 library(here)
 library(beepr)
 
+set.seed(1)
+
 mediocrethemes::set_mediocre_all(pal = "coty")
 ```
 
@@ -148,7 +150,9 @@ generate_data_TWFE <- function(N_i,
       t_centered = t - t_event,
       x = rnorm(nrow(.), mu_x, sigma_x),
       e = rnorm(nrow(.), 0, sigma_e),
-      y = alpha + beta_i * treated + gamma * x + indiv_fe + time_fe + e
+      y0 = alpha + gamma * x + indiv_fe + time_fe + e,
+      y1 = y0 + beta_i,
+      y = treated*y1 + (1 - treated)*y0
     )
   
   return(data)
@@ -302,6 +306,20 @@ baseline_parameters_TWFE %>%
 ### Run a whole simulation
 
  To do so I create the function `compute_simulation_TWFE`. This simple function takes as input the various parameters an returns a table with the estimate of the treatment, its p-value and standard error and all input parameters. 
+ 
+But first, we want to compute the true effect (the ATT) to add it to our output.
+
+```{r compute_true_effect}
+compute_true_effect_TWFE <- function(data) {
+  data %>% 
+    filter(in_treatment) %>% 
+    group_by(t_centered) %>% 
+    summarise(true_effect = mean(treated*(y1 - y0))) %>% 
+    rename(lag = t_centered)
+}  
+```
+
+We can then compute the simulation.
 
 ```{r compute_simulation}
 compute_simulation_TWFE <- function(N_i,
@@ -320,7 +338,7 @@ compute_simulation_TWFE <- function(N_i,
                                     mu_x = 0,
                                     sigma_x = 0,
                                     gamma = 0) {
-  generate_data_TWFE(
+  data <- generate_data_TWFE(
     N_i = N_i,
     N_t = N_t,
     sigma_e = sigma_e,
@@ -337,26 +355,29 @@ compute_simulation_TWFE <- function(N_i,
     mu_x = mu_x,
     sigma_x = sigma_x,
     gamma = gamma
-  ) %>%
-  estimate_TWFE() %>%
-  mutate(
-    N_i = N_i,
-    N_t = N_t,
-    sigma_e = sigma_e,
-    p_treat = p_treat,
-    staggered = staggered,
-    het_indiv = het_indiv,
-    het_time = het_time,
-    alpha = alpha,
-    beta = beta,
-    mu_indiv_fe = mu_indiv_fe,
-    sigma_indiv_fe = sigma_indiv_fe,
-    mu_time_fe = mu_time_fe,
-    sigma_time_fe = sigma_time_fe,
-    mu_x = mu_x,
-    sigma_x = sigma_x,
-    gamma = gamma
-  )
+  ) 
+  
+  data %>%
+    estimate_TWFE() %>%
+    mutate(
+      N_i = N_i,
+      N_t = N_t,
+      sigma_e = sigma_e,
+      p_treat = p_treat,
+      staggered = staggered,
+      het_indiv = het_indiv,
+      het_time = het_time,
+      alpha = alpha,
+      beta = beta,
+      mu_indiv_fe = mu_indiv_fe,
+      sigma_indiv_fe = sigma_indiv_fe,
+      mu_time_fe = mu_time_fe,
+      sigma_time_fe = sigma_time_fe,
+      mu_x = mu_x,
+      sigma_x = sigma_x,
+      gamma = gamma
+    ) %>% 
+    left_join(compute_true_effect_TWFE(data), by = "lag")
 } 
 ```
 
@@ -369,16 +390,51 @@ baseline_parameters_TWFE %>%
 
 ## Analysis of the results
 
+To analyze the results, I build a simple function to run the regression and graph the results. It takes as inputs the baseline parameters and our parameters of interest.
+
 ```{r graph_result}
+graph_results <- function(baseline_parameters, 
+                          staggered = TRUE, 
+                          het_indiv = "homogeneous", 
+                          het_time = "constant") {
+  
+  baseline_parameters["staggered"] <- staggered
+  baseline_parameters["het_indiv"] <- het_indiv
+  baseline_parameters["het_time"] <- het_time
+  
+  graph <- baseline_parameters %>%
+    pmap_dfr(compute_simulation_TWFE) %>% 
+    filter(dplyr::between(lag, -5, 5)) %>% 
+    mutate(
+      estimate_level = (estimate - estimate[which(lag == 0)]),
+      true_effect_level = (true_effect - true_effect[which(lag == 0)])
+    ) %>% 
+    ggplot() +
+    geom_point(aes(x = lag, y = estimate_level)) +
+    geom_point(aes(x = lag, y = true_effect_level), shape = 1) +
+    # geom_errorbar(aes(x = lag, ymin=estimate_level-se, ymax=estimate_level+se)) +
+    labs(
+      x = "Lag",
+      y = "Estimate (centered)",
+      title = "Representation of estimates for each lag",
+      subtitle = paste(
+      ifelse(staggered, "Staggered,", "Non staggered,"),
+      het_indiv, ",",
+      het_time,
+      "treatment"),
+      caption = "Hollow points represent the centered true effect"
+    )
+  
+  return(graph)
+}
+ 
 baseline_parameters_TWFE %>% 
-  pmap_dfr(compute_simulation_TWFE) %>% 
-  filter(dplyr::between(lag, -5, 5)) %>% 
-  mutate(estimate_level = (estimate - estimate[which(lag == 0)])) %>% 
-  ggplot(aes(x = lag, y = estimate_level)) +
-  geom_point() +
-  labs(
-    x = "Lag",
-    y = "Estimate (centered)",
-    title = "Representation of estimates for each lag"
-  )
+  graph_results()
+```
+
+We can reproduce this graph for varying types of treatment.
+
+```{r graph_result_others}
+baseline_parameters_TWFE %>% 
+  graph_results(staggered = TRUE, het_indiv = "large_first", het_time = "linear") 
 ```
