@@ -8,3 +8,10 @@ This repository contains the following:
 - **Literature**: Papers for new methods used in the code.
 - **Output**: Folder for saving results.
 - **Summary**: Very short summary of methods and datasets.
+
+--- 
+Notes: 
+- Potential issue with Sun and Abraham event study method in Stata, but runs well in R. 
+- Callaway and Sant'anna a lot faster in R. 
+
+Other helpful links: 
