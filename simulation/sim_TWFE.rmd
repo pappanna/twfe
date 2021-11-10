@@ -1,14 +1,15 @@
 ---
-title: "Simulations OVB/type M trade-off: IV"
+title: "Simulations TWFE"
 author:
   - name: Vincent Bagilet 
     url: https://vincentbagilet.github.io/
     affiliation: Columbia University
     affiliation_url: https://www.columbia.edu/
-date: "`r Sys.Date()`"
+date: "November 4, 2021"
 output: 
   distill::distill_article:
     toc: true
+    code_folding: Show code
 editor_options: 
   chunk_output_type: console
 ---
@@ -31,9 +32,13 @@ opts_chunk$set(fig.path = "images/",
                fig.align = "center")  
 ```  
 
-## Purpose of the document
+## Purpose of the document and summary
 
 In this document, I run a simulation exercise to illustrate issues arising when estimating Two-Way Fixed Effect (TWFE) models with staggered and heterogeneous treatment.
+
+**Summary**: if one only wants to use the data generated here and play with it without reading my whole spiel, they can use the function `generate_data_TWFE`. It takes many parameters but they are all pretty intuitive and described in the section "Modelisation choices" of this document. The other useful function is `compute_simulation_TWFE`. Taking similar parameters as `generate_data_TWFE` it generates the data and runs an estimation.
+
+## Packages
 
 First, I load useful packages. Note that some packages are optional. If you do not want to install/use them, you may need to modify part of your code. `mediocrethemes` is my ggplot theme package. If you want to use it, you can find instructions [here](https://vincentbagilet.github.io/mediocrethemes/).
 
@@ -43,6 +48,7 @@ library(tidyverse)
 library(fixest)
 library(knitr) 
 library(broom)
+library(scales)
 
 #Optional packages
 library(mediocrethemes) 
@@ -52,7 +58,7 @@ library(beepr)
 
 set.seed(1)
 
-mediocrethemes::set_mediocre_all(pal = "coty")
+mediocrethemes::set_mediocre_all(pal = "coty", gradient = "left")
 ```
 
 ## Building the example
@@ -79,10 +85,22 @@ More precisely, I set:
 - $x_{it} \sim \mathcal{N}(\mu_{x}, \sigma_{x}^{2})$
 - $e_{it} \sim \mathcal{N}(0, \sigma_{e}^{2})$ some noise
 - $T_{it}$ represent the treatment allocation, it is equal to one if individual $i$ is treated at time $t$ and 0 otherwise,
-- $y_{it} = \alpha + \beta_i T_{it} + \gamma x_{it} + \lambda_i + \eta_t + e_{it}$ where $\alpha$ and $\gamma$ are some constants.
-- $\beta_i$ is represents the magnitude of the treatment effect and is linked to the input parameter `beta`. Across individuals, the treatment can either be homogeneous (`het_indiv == homogeneous`, for each individual, the treatment is equal to `beta`), random (`het_indiv == random`, for each individual, the treatment is drawn from  $\mathcal{U}(0.5\beta, 1.5\beta)$) or larger for those that are treated first (`het_indiv == large_first`, for each individual, the treatment is equal to $N_t - \beta$). Across time, the effect of the treatment can either be constant (`het_time == constant`) or increasing linearly in time (`het_time == linear`).
+- $y_{it} = \alpha + \beta_{it} T_{it} + \gamma x_{it} + \lambda_i + \eta_t + e_{it}$ where $\alpha$ and $\gamma$ are some constants.
+- $\beta_{it}$ is represents the magnitude of the treatment effect and is linked to the input parameter `beta`. 
+
+  - Across individuals, the treatment can either be:
+  
+    - homogeneous: `het_indiv == homogeneous`, for each individual, the treatment is equal to `beta`, 
+    - random: `het_indiv == random`, for each individual, the treatment is drawn from  $\mathcal{U}(0.5\beta, 1.5\beta)$,
+    - larger for those that are treated first: `het_indiv == large_first`, for each individual, the treatment is equal to $N_t - \beta$.
+  
+  - Across time, the effect of the treatment can either be 
+    
+    - constant: `het_time == constant`,
+    - increasing linearly in time: `het_time == linear`.
 
 I also create a bunch of variables that can be useful:
+
 - $InTreatment_i$ equal to 1 if individual $i$ ever gets treated,
 - $t^{event}_i$ equal to the date at which individual $i$ gets treated,
 - $t^{centered}_i$ representing the distance in terms of period to the beginning of the treatment for individual $i$,
@@ -159,7 +177,7 @@ generate_data_TWFE <- function(N_i,
 }
 ```
 
-I set baseline values for the parameters as very standard. These values are completely arbitrary.
+I set baseline values for the parameters as very standard. These values are arbitrary.
 
 ```{r baseline_param}
 baseline_parameters_TWFE <- tibble(
@@ -185,7 +203,7 @@ baseline_parameters_TWFE %>%
   kable()
 ```
 
-Let's now have a look at different types of treatment and treatment allocations. First, let's look at treatment allocation mechanisms. The allocation can either be staggered or not
+Let's now have a look at different types of treatment and treatment allocations. First, let's look at treatment allocation mechanisms. The allocation can either be staggered or not, the treatment homogeneous across individual or not and cconstant or not in time.
 
 ```{r treatment_allocation, echo=FALSE}
 labs_graph_staggered <- labs(
@@ -198,8 +216,8 @@ labs_graph_staggered <- labs(
 baseline_parameters_TWFE %>% 
   mutate(staggered = FALSE) %>%
   pmap_dfr(generate_data_TWFE) %>% #use pmap to pass the set of parameters
-  ggplot(aes(x = t, y = factor(indiv), fill = fct_rev(factor(treated)))) + 
-  geom_tile(color = "white", lwd = 0.5, linetype = 1) +
+  ggplot(aes(x = t, y = factor(indiv), fill = factor(treated))) + 
+  geom_tile(color = "white", lwd = 0.3, linetype = 1) +
   coord_fixed() +
   labs_graph_staggered + 
   labs(subtitle = "Non staggered")
@@ -207,8 +225,8 @@ baseline_parameters_TWFE %>%
 baseline_parameters_TWFE %>% 
   mutate(staggered = TRUE) %>%
   pmap_dfr(generate_data_TWFE) %>% #use pmap to pass the set of parameters
-  ggplot(aes(x = t, y = factor(indiv), fill = fct_rev(factor(treated)))) + 
-  geom_tile(color = "white", lwd = 0.5, linetype = 1) +
+  ggplot(aes(x = t, y = factor(indiv), fill = factor(treated))) + 
+  geom_tile(color = "white", lwd = 0.3, linetype = 1) +
   coord_fixed() +
   labs_graph_staggered + 
   labs(subtitle = "Staggered")
@@ -224,13 +242,11 @@ labs_graph_size <- labs(
     fill = "Treatment effect size"
   )
 
-set_mediocre_all(pal = "blackandwhite")
-
 baseline_parameters_TWFE %>% 
   mutate(het_indiv = "homogeneous", het_time = "constant") %>%
   pmap_dfr(generate_data_TWFE) %>% #use pmap to pass the set of parameters
   ggplot(aes(x = t, y = factor(indiv), fill = round(treated*beta_i, 2))) + 
-  geom_tile(color = "white", lwd = 0.5, linetype = 1) +
+  geom_tile(color = "white", lwd = 0.3, linetype = 1) +
   coord_fixed() +
   labs_graph_size + 
   labs(subtitle = "Homogeneous treatment effect across individuals, constant in time")
@@ -239,7 +255,7 @@ baseline_parameters_TWFE %>%
   mutate(het_indiv = "random", het_time = "constant") %>%
   pmap_dfr(generate_data_TWFE) %>% #use pmap to pass the set of parameters
   ggplot(aes(x = t, y = factor(indiv), fill = round(treated*beta_i, 2))) + 
-  geom_tile(color = "white", lwd = 0.5, linetype = 1) +
+  geom_tile(color = "white", lwd = 0.3, linetype = 1) +
   coord_fixed() +
   labs_graph_size + 
   labs(subtitle = "Random treatment effect size across individuals, constant in time")
@@ -248,7 +264,7 @@ baseline_parameters_TWFE %>%
   mutate(het_indiv = "large_first", het_time = "constant") %>%
   pmap_dfr(generate_data_TWFE) %>% #use pmap to pass the set of parameters
   ggplot(aes(x = t, y = factor(indiv), fill = round(treated*beta_i, 2))) + 
-  geom_tile(color = "white", lwd = 0.5, linetype = 1) +
+  geom_tile(color = "white", lwd = 0.3, linetype = 1) +
   coord_fixed() +
   labs_graph_size + 
   labs(subtitle = "First treated have larger treatment effect, constant in time")
@@ -261,18 +277,17 @@ baseline_parameters_TWFE %>%
   mutate(het_indiv = "homogeneous", het_time = "linear") %>%
   pmap_dfr(generate_data_TWFE) %>% #use pmap to pass the set of parameters
   ggplot(aes(x = t, y = factor(indiv), fill = round(treated*beta_i, 2))) + #treated*beta_i
-  geom_tile(color = "white", lwd = 0.5, linetype = 1) +
+  geom_tile(color = "white", lwd = 0.3, linetype = 1) +
   coord_fixed() +
-  mediocrethemes::scale_mediocre_c("blackandwhite") +
   labs_graph_size +
   labs(subtitle = "Treatment effect increasing linearly in time")
-
-set_mediocre_all(pal = "coty")
 ```
+
+One can now play with this function to generate their own data and run their own analyses. In the following sections, I try to run my own analyses.
 
 ### Estimation
 
-After generating the data, we can run an estimation.
+First, I write a function ,`estimate_TWFE`. to run an estimation of a simple distributed lag model, in a simple event study type of analysis. My knowledge on the topic is limited and I built this analysis quickly. My analysis is likely to be flawed. One should thus use it with caution. Regardless, this code could hopefully be used as a template for a more informed analysis.
 
 ```{r estimate}
 estimate_TWFE <- function(data) {
@@ -291,23 +306,30 @@ estimate_TWFE <- function(data) {
     broom::tidy() %>% 
     rename(p_value = p.value, se = std.error) %>% 
     mutate(term = as.numeric(str_remove_all(term, "in_treatment\\:t_centered"))) %>% 
-    rename(lag = term)
+    rename(lag = term) %>% 
+    select(-statistic) %>% 
+    suppressMessages() #Warning saying that NA values dropped and 
+    #that one or two factors are removed due to colinearity
   
   return(reg)
 }
 ```
 
+Here is an example output for such a simulation (limited to the 15 first lags).
+
 ```{r one_estimation}
 baseline_parameters_TWFE %>% 
   pmap_dfr(generate_data_TWFE) %>%
-  estimate_TWFE() 
+  estimate_TWFE() %>% 
+  slice(1:15) %>% 
+  kable()
 ```
 
 ### Run a whole simulation
 
- To do so I create the function `compute_simulation_TWFE`. This simple function takes as input the various parameters an returns a table with the estimate of the treatment, its p-value and standard error and all input parameters. 
+To run a whole simulation, I create the function `compute_simulation_TWFE`. This simple function takes as input the various parameters aforementioned an returns a table with the estimate of the treatment, its p-value and standard error and all input parameters. 
  
-But first, we want to compute the true effect (the ATT) to add it to our output.
+Before writing this function, I compute the true effect (the ATT) to add it to the output of the simulation.
 
 ```{r compute_true_effect}
 compute_true_effect_TWFE <- function(data) {
@@ -319,7 +341,7 @@ compute_true_effect_TWFE <- function(data) {
 }  
 ```
 
-We can then compute the simulation.
+I can then compute the simulation.
 
 ```{r compute_simulation}
 compute_simulation_TWFE <- function(N_i,
@@ -390,7 +412,7 @@ baseline_parameters_TWFE %>%
 
 ## Analysis of the results
 
-To analyze the results, I build a simple function to run the regression and graph the results. It takes as inputs the baseline parameters and our parameters of interest.
+To analyze the results, I build a simple function to run the regression and graph the results. It takes as inputs the baseline parameters and our parameters of interest and return a graph of the lag-estimates.
 
 ```{r graph_result}
 graph_results <- function(baseline_parameters, 
@@ -407,12 +429,16 @@ graph_results <- function(baseline_parameters,
     filter(dplyr::between(lag, -5, 5)) %>% 
     mutate(
       estimate_level = (estimate - estimate[which(lag == 0)]),
-      true_effect_level = (true_effect - true_effect[which(lag == 0)])
+      true_effect_level = (true_effect - true_effect[which(lag == 0)]), 
+      lag = as.integer(lag)
     ) %>% 
-    ggplot() +
-    geom_point(aes(x = lag, y = estimate_level)) +
+    ggplot(aes(x = lag, y = estimate_level)) +
+    geom_point() +
     geom_point(aes(x = lag, y = true_effect_level), shape = 1) +
-    # geom_errorbar(aes(x = lag, ymin=estimate_level-se, ymax=estimate_level+se)) +
+    scale_x_continuous(breaks = scales::pretty_breaks()) +
+    geom_pointrange(aes(
+      ymin = estimate_level-1.96*se,
+      ymax = estimate_level+1.96*se)) +
     labs(
       x = "Lag",
       y = "Estimate (centered)",
@@ -422,19 +448,129 @@ graph_results <- function(baseline_parameters,
       het_indiv, ",",
       het_time,
       "treatment"),
-      caption = "Hollow points represent the centered true effect"
+      caption = "Hollow points represent the centered true effect
+      Vertical bars represent 95% confidence intervals"
     )
   
   return(graph)
 }
- 
-baseline_parameters_TWFE %>% 
-  graph_results()
 ```
 
-We can reproduce this graph for varying types of treatment.
-
-```{r graph_result_others}
+```{r graph_result_others, echo=FALSE}
 baseline_parameters_TWFE %>% 
   graph_results(staggered = TRUE, het_indiv = "large_first", het_time = "linear") 
+
+baseline_parameters_TWFE %>% 
+  graph_results(staggered = TRUE, het_indiv = "random", het_time = "linear") 
+
+baseline_parameters_TWFE %>% 
+  graph_results(staggered = TRUE, het_indiv = "homogeneous", het_time = "linear") 
+
+baseline_parameters_TWFE %>% 
+  graph_results(staggered = TRUE, het_indiv = "large_first", het_time = "constant") 
+
+baseline_parameters_TWFE %>% 
+  graph_results(staggered = TRUE, het_indiv = "random", het_time = "constant") 
+
+baseline_parameters_TWFE %>% 
+  graph_results(staggered = TRUE, het_indiv = "homogeneous", het_time = "constant") 
 ```
+
+Out of these simulations, we notice that in most cases, the two ways fixed effect model yields incorrect estimates. Further and more precise analysis should and could be ran here. Note that for some types of treatment, the variation is too limited to be able to precisely estimate the effect of interest.
+
+# Comparing performance
+
+I then try to compare more systematically the performance of the TWFE model in the different settings. To do so I run a Monte-Carlo simulation, creating many independent data sets and running the event study on each of them. To do so, I then compute the pre-treatment bias, *ie* the presence of pre-trends, the post-treatment bias and RMSE for each simulation.
+
+I run the simulations for different sets of parameters by mapping the `compute_simulation_TWFE` function on each set of parameters. I enclose these parameters into a table, `param_TWFE`. Note that in this table each set of parameters appears `n_iter` times as we want to run the analysis $n_{iter}$ times for each set of parameters. 
+
+```{r set_param}
+n_iter <- 100
+
+param_TWFE <- baseline_parameters_TWFE %>% 
+  select(-het_indiv, -het_time) %>% 
+  crossing(
+    # staggered = c(TRUE, FALSE),
+    het_indiv = c("large_first", "random", "homogeneous"),
+    het_time = c("constant", "linear")
+  ) %>% 
+  crossing(rep_id = 1:n_iter) %>% 
+  select(-rep_id)
+```
+
+I can now run the simulations by mapping the `compute_simulation_TWFE` function on `param_TWFE`.
+
+```{r run_sim, eval=FALSE}
+tic()
+simulations_TWFE <- pmap_dfr(param_TWFE, compute_simulation_TWFE)
+beep()
+toc()
+
+# saveRDS(simulations_TWFE, here("TWFE/Outputs/simulations_TWFE.RDS"))
+```
+
+I want to compute the summary variables of interest (average pre-treatment bias, post-treatment bias , RMSE). To make bias comparable across simulations, I normalize it by dividing it by the mean of the true effects. This normalization method is somehow arbitrary. To run these analyses, I only consider -5 to +5 lags around the treatment time. 
+
+```{r summarise}
+simulations_TWFE <- readRDS(here("TWFE/Outputs/simulations_TWFE.RDS"))
+
+summarise_simulations <- function(data) {
+  data %>%
+    filter(dplyr::between(lag, -5, 5)) %>% 
+    mutate(mean_true_effect = mean(true_effect, na.rm = TRUE)) %>% 
+    group_by(across(c(-estimate, -se, -p_value, -true_effect))) %>% 
+    #group by basically all the DGP parameters
+    summarise(
+      bias = mean((estimate - true_effect)/mean_true_effect, na.rm = TRUE),
+      rmse = sqrt(mean(((estimate - true_effect)/mean_true_effect)^2)), 
+      .groups	= "drop"
+    ) %>% 
+    mutate(post = ifelse(lag >= 0, "post", "pre")) %>% 
+    group_by(across(c(-lag, -bias, -rmse))) %>%
+    summarise(
+      bias = mean(bias), 
+      rmse = mean(rmse),
+      .groups	= "drop"
+    ) %>% 
+    pivot_wider(
+      names_from = post, 
+      values_from = c(bias, rmse)
+    ) %>% 
+    select(-rmse_pre)
+}
+
+summary_simulations_TWFE <- summarise_simulations(simulations_TWFE)
+# saveRDS(summary_simulations_TWFE, here("TWFE/Outputs/summary_simulations_TWFE.RDS"))
+```
+
+Then, we quickly graph these results to analyze them. Note that I only varied 2 parameters across simulations, `het_indiv` and `het_time`. 
+
+```{r graph_summarise, echo=FALSE, fig.asp=1.8}
+summary_simulations_TWFE %>% 
+  select(het_indiv, het_time, bias_post, bias_pre, rmse_post) %>% 
+  pivot_longer(cols = c(bias_post, bias_pre, rmse_post), names_to = "statistics") %>% 
+  mutate(
+    statistics = str_to_title(str_replace(statistics, "_", " ")),
+    het_indiv = str_to_title(str_replace(het_indiv, "_", " ")),
+    het_indiv = paste("Indiv:", het_indiv),
+    het_time = str_to_title(str_replace(het_time, "_", " ")),
+    het_time = paste("Time:", het_time),
+  ) %>% 
+  # filter(statistics != "rmse_post") %>% 
+  ggplot(aes(x = "", y = value, fill = statistics)) +
+  geom_col(position = "dodge") +
+  facet_grid(het_indiv ~ het_time) + 
+  labs(
+    title = "Comparison of different statistics across different treatment types",
+    x = "",
+    y = "Mean value for each statistic",
+    fill = ""
+  )
+```
+
+One can notice that the TWFE issue discussed here is much more prevalent in the case of effects that are non constant in time and that increase in time. As discussed in the literature, in cases with non constant treatment effects in time and where treatment effect are larger for units treated first (an rather common setting), TWFE effects may yield highly incorrect values. 
+
+
+
+
+
