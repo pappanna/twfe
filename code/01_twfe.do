@@ -284,7 +284,6 @@ display `eventstudyavg'
 
 **************************************************************
 ************* 04 - SUN AND ABRAHAM (2020) ********************
-***** something is not working here with this implementation? not sure 
 
 use "data/`filename'.dta", clear
 
